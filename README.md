@@ -20,6 +20,10 @@ This repository hosts a Next.js 14 application for visualizing and validating Ge
 - **Node.js**: Ensure Node.js is installed on your machine. [Download Node.js](https://nodejs.org/).
 - **npm** or **yarn**: This project uses npm or yarn for dependency management.
 
+
+### Vercel
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fessamamdani%2Fgeojson&project-name=geojson&repo-name=geojson)
+
 ### Installation
 
 1. **Clone the Repository**: Clone this repository to your local machine.
