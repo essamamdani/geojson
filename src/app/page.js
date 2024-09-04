@@ -1,113 +1,451 @@
-import Image from "next/image";
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { sampleGeoJSON } from '@/libs/data';
 
-export default function Home() {
+const GeoJSONViewer = () => {
+  const [geoJSONText, setGeoJSONText] = useState("");
+  const [clearCurrent, setClearCurrent] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [doUpdate, setDoUpdate] = useState(false);
+  const mapRef = useRef(null);
+  const geojsonLayerRef = useRef(null);
+
+  const [dropdownOpen, setDropdownOpen] = useState({
+    Point: false,
+    LineString: false,
+    Polygon: false,
+    Feature: false,
+    GeometryCollection: false,
+  });
+
+  const closeAllDropdowns = () => {
+    setDropdownOpen({
+      Point: false,
+      LineString: false,
+      Polygon: false,
+      Feature: false,
+      GeometryCollection: false,
+    });
+  };
+
+  const toggleDropdown = (menu) => {
+    closeAllDropdowns();
+    setDropdownOpen((prev) => ({
+      ...prev,
+      [menu]: !prev[menu],
+    }));
+  };
+
+  // useEffect(() => {
+  //   if (mapRef.current === null) {
+  //     const mapboxMap = L.map('map-container').setView([37.92686, -96.76757], 4);
+
+  //     L.tileLayer(
+  //       `https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}`,
+  //       {
+  //         id: 'mapbox/streets-v11',
+  //         tileSize: 512,
+  //         zoomOffset: -1,
+  //         accessToken: mapboxAccessToken,
+  //       }
+  //     ).addTo(mapboxMap);
+
+  //     const geojsonLayer = L.geoJSON(null, {
+  //       onEachFeature: (feature, layer) => {
+  //         if (feature.properties) {
+  //           let popupContent = '<div class="popup">';
+  //           for (const prop in feature.properties) {
+  //             popupContent += `${prop}: ${feature.properties[prop]}<br />`;
+  //           }
+  //           popupContent += '</div>';
+  //           layer.bindPopup(popupContent, { maxHeight: 200 });
+  //         }
+  //       },
+  //     });
+
+  //     geojsonLayer.addTo(mapboxMap);
+
+  //     mapRef.current = mapboxMap;
+  //     geojsonLayerRef.current = geojsonLayer;
+  //     displayGeoJSONType('Point');
+  //   }
+  // }, []);
+
+  useEffect(() => {
+    if (mapRef.current === null) {
+      const mapboxMap = L.map('map-container').setView([37.92686, -96.76757], 4);
+  
+      L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }
+      ).addTo(mapboxMap);
+  
+      const geojsonLayer = L.geoJSON(null, {
+        onEachFeature: (feature, layer) => {
+          if (feature.properties) {
+            let popupContent = '<div class="popup">';
+            for (const prop in feature.properties) {
+              popupContent += `${prop}: ${feature.properties[prop]}<br />`;
+            }
+            popupContent += '</div>';
+            layer.bindPopup(popupContent, { maxHeight: 200 });
+          }
+        },
+      });
+  
+      geojsonLayer.addTo(mapboxMap);
+  
+      mapRef.current = mapboxMap;
+      geojsonLayerRef.current = geojsonLayer;
+      displayGeoJSONType('Point');
+    }
+  }, []);
+  const handleGeoJSONChange = (event) => {
+    setGeoJSONText(event.target.value);
+  };
+
+  const handleClearCurrentChange = (event) => {
+    setClearCurrent(event.target.checked);
+  };
+
+  const handleTestGeoJSON = async () => {
+    try {
+      const response = await fetch('/api/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ geoJSON: geoJSONText }),
+      });
+
+      const data = await response.json();
+
+      if (data.errors.length > 0) {
+        const errorMessage = data.errors
+          .map((error) => `Line ${error.line}: ${error.message}`)
+          .join('<br>');
+        setErrorMessage(errorMessage);
+      } else {
+        setErrorMessage('');
+        if (clearCurrent && geojsonLayerRef.current) {
+          geojsonLayerRef.current.clearLayers();
+        }
+        if (geojsonLayerRef.current) {
+          geojsonLayerRef.current.addData(JSON.parse(geoJSONText));
+          mapRef.current?.fitBounds(geojsonLayerRef.current.getBounds());
+        }
+      }
+    } catch (error) {
+      console.error('Error validating GeoJSON:', error);
+      setErrorMessage(
+        'An error occurred while validating the GeoJSON. Please check your input.'
+      );
+    }
+  };
+
+  const handleClearGeoJSON = () => {
+    setGeoJSONText('');
+  };
+
+  const displayGeoJSONType = (geoJSONType) => {
+    setGeoJSONText(JSON.stringify(sampleGeoJSON[geoJSONType], null, 4));
+    setDoUpdate(true);
+  };
+
+  useEffect(() => {
+    if (geoJSONText && doUpdate) {
+      handleTestGeoJSON();
+      setDoUpdate(false);
+    }
+  }, [geoJSONText, doUpdate]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
+    <div>
+      <nav className="bg-white p-4 shadow-md">
+        <div className="container mx-auto flex flex-wrap justify-between items-center">
+          <div className="text-gray-800 font-semibold text-xl">GeoJSONLint</div>
+          <div className="space-x-4 flex flex-wrap items-center">
+            {/* Point Dropdown */}
+            <div className="relative inline-block text-left">
+              <div>
+                <button
+                  onClick={() => toggleDropdown('Point')}
+                  className="text-gray-800 inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium hover:bg-gray-100 focus:outline-none"
+                >
+                  Point
+                  <svg
+                    className="-mr-1 ml-2 h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+              {dropdownOpen.Point && (
+                <div className="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[99999999]">
+                  <div className="py-1">
+                    <button
+                      onClick={() => displayGeoJSONType('Point')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      Point
+                    </button>
+                    <button
+                      onClick={() => displayGeoJSONType('MultiPoint')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      MultiPoint
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* LineString Dropdown */}
+            <div className="relative inline-block text-left">
+              <div>
+                <button
+                  onClick={() => toggleDropdown('LineString')}
+                  className="text-gray-800 inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium hover:bg-gray-100 focus:outline-none"
+                >
+                  LineString
+                  <svg
+                    className="-mr-1 ml-2 h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+              {dropdownOpen.LineString && (
+                <div className="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[99999999]">
+                  <div className="py-1">
+                    <button
+                      onClick={() => displayGeoJSONType('LineString')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      LineString
+                    </button>
+                    <button
+                      onClick={() => displayGeoJSONType('MultiLineString')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      MultiLineString
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Polygon Dropdown */}
+            <div className="relative inline-block text-left">
+              <div>
+                <button
+                  onClick={() => toggleDropdown('Polygon')}
+                  className="text-gray-800 inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium hover:bg-gray-100 focus:outline-none"
+                >
+                  Polygon
+                  <svg
+                    className="-mr-1 ml-2 h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+              {dropdownOpen.Polygon && (
+                <div className="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[99999999]">
+                  <div className="py-1">
+                    <button
+                      onClick={() => displayGeoJSONType('Polygon')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      Polygon
+                    </button>
+                    <button
+                      onClick={() => displayGeoJSONType('MultiPolygon')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      MultiPolygon
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Feature Dropdown */}
+            <div className="relative inline-block text-left">
+              <div>
+                <button
+                  onClick={() => toggleDropdown('Feature')}
+                  className="text-gray-800 inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium hover:bg-gray-100 focus:outline-none"
+                >
+                  Feature
+                  <svg
+                    className="-mr-1 ml-2 h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+              {dropdownOpen.Feature && (
+                <div className="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[99999999]">
+                  <div className="py-1">
+                    <button
+                      onClick={() => displayGeoJSONType('Feature')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      Feature
+                    </button>
+                    <button
+                      onClick={() => displayGeoJSONType('FeatureCollection')}
+                      className="text-gray-700 block px-4 py-2 text-sm w-full text-left hover:bg-gray-100"
+                    >
+                      FeatureCollection
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* GeometryCollection Button */}
+            <div className="relative inline-block text-left">
+              <div>
+                <button
+                  onClick={() => {closeAllDropdowns();displayGeoJSONType('GeometryCollection')}}
+                  className="text-gray-800 inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium hover:bg-gray-100 focus:outline-none"
+                >
+                  GeometryCollection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="container mx-auto mt-4 px-4">
+        <p className="mb-4">
+          Use this site to validate and view your GeoJSON. For details about GeoJSON,{' '}
           <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
+            href="https://tools.ietf.org/html/rfc7946"
+            rel="nofollow noopener noreferrer"
             target="_blank"
-            rel="noopener noreferrer"
+            className="text-blue-500 underline"
           >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
+            read the spec
           </a>
+          .
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <textarea
+              id="geojson-input"
+              placeholder="Paste GeoJSON here"
+              className="form-control w-full mb-2 p-2 border border-gray-300 rounded text-black h-96"
+              value={geoJSONText}
+              onChange={(e) => setGeoJSONText(e.target.value)}
+            />
+
+            <div className="mb-2 flex items-center">
+              <input
+                id="clear-current"
+                type="checkbox"
+                checked={clearCurrent}
+                onChange={handleClearCurrentChange}
+                className="mr-2"
+              />
+              <label htmlFor="clear-current" className="text-gray-700">
+                Clear Current Features
+              </label>
+            </div>
+
+            <div className="flex space-x-2">
+              <button
+                id="submit"
+                className="btn bg-blue-500 text-white py-2 px-4 rounded"
+                onClick={handleTestGeoJSON}
+              >
+                Test GeoJSON
+              </button>
+              <button
+                id="clear"
+                className="btn bg-gray-300 text-gray-800 py-2 px-4 rounded"
+                onClick={handleClearGeoJSON}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="col-span-2">
+            <div id="map-container" className="w-full h-96 bg-gray-200 rounded-md"></div>
+          </div>
         </div>
       </div>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+      {errorMessage && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-[9999999]">
+          <div className="bg-white rounded-lg overflow-hidden shadow-xl max-w-md w-full">
+            <div className="px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Invalid JSON</h3>
+              <p className="text-gray-700">{errorMessage}</p>
+            </div>
+            <div className="px-6 py-4 bg-gray-100 text-right">
+              <button
+                className="btn bg-blue-500 text-white py-2 px-4 rounded"
+                onClick={() => setErrorMessage('')}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
-}
+};
+
+const Home = () => {
+  return (
+    <div>
+      <GeoJSONViewer />
+    </div>
+  );
+};
+
+export default Home;
