@@ -1,9 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import L from 'leaflet';
+import dynamic from 'next/dynamic';
+
 import 'leaflet/dist/leaflet.css';
 import { sampleGeoJSON } from '@/libs/data';
-
+// Dynamically load Leaflet to avoid SSR issues
+const L = dynamic(() => import('leaflet'), {
+  ssr: false, // This ensures Leaflet is only loaded on the client
+});
 const GeoJSONViewer = () => {
   const [geoJSONText, setGeoJSONText] = useState("");
   const [clearCurrent, setClearCurrent] = useState(true);
@@ -76,7 +80,7 @@ const GeoJSONViewer = () => {
   useEffect(() => {
     if (mapRef.current === null) {
       const mapboxMap = L.map('map-container').setView([37.92686, -96.76757], 4);
-  
+
       L.tileLayer(
         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         {
@@ -84,7 +88,7 @@ const GeoJSONViewer = () => {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }
       ).addTo(mapboxMap);
-  
+
       const geojsonLayer = L.geoJSON(null, {
         onEachFeature: (feature, layer) => {
           if (feature.properties) {
@@ -97,9 +101,9 @@ const GeoJSONViewer = () => {
           }
         },
       });
-  
+
       geojsonLayer.addTo(mapboxMap);
-  
+
       mapRef.current = mapboxMap;
       geojsonLayerRef.current = geojsonLayer;
       displayGeoJSONType('Point');
@@ -114,37 +118,41 @@ const GeoJSONViewer = () => {
   };
 
   const handleTestGeoJSON = async () => {
-    try {
-      const response = await fetch('/api/validate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ geoJSON: geoJSONText }),
-      });
+    if (typeof window !== 'undefined') {
+      try {
+        const response = await fetch('/api/validate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ geoJSON: geoJSONText }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (data.errors.length > 0) {
-        const errorMessage = data.errors
-          .map((error) => `Line ${error.line}: ${error.message}`)
-          .join('<br>');
-        setErrorMessage(errorMessage);
-      } else {
-        setErrorMessage('');
-        if (clearCurrent && geojsonLayerRef.current) {
-          geojsonLayerRef.current.clearLayers();
+        if (data.errors.length > 0) {
+          const errorMessage = data.errors
+            .map((error) => `Line ${error.line}: ${error.message}`)
+            .join('<br>');
+          setErrorMessage(errorMessage);
+        } else {
+          setErrorMessage('');
+          if (clearCurrent && geojsonLayerRef.current) {
+            geojsonLayerRef.current.clearLayers();
+          }
+          if (geojsonLayerRef.current) {
+            if (typeof window !== 'undefined') {
+              geojsonLayerRef.current.addData(JSON.parse(geoJSONText));
+              mapRef.current?.fitBounds(geojsonLayerRef.current.getBounds());
+            }
+          }
         }
-        if (geojsonLayerRef.current) {
-          geojsonLayerRef.current.addData(JSON.parse(geoJSONText));
-          mapRef.current?.fitBounds(geojsonLayerRef.current.getBounds());
-        }
+      } catch (error) {
+        console.error('Error validating GeoJSON:', error);
+        setErrorMessage(
+          'An error occurred while validating the GeoJSON. Please check your input.'
+        );
       }
-    } catch (error) {
-      console.error('Error validating GeoJSON:', error);
-      setErrorMessage(
-        'An error occurred while validating the GeoJSON. Please check your input.'
-      );
     }
   };
 
@@ -153,8 +161,10 @@ const GeoJSONViewer = () => {
   };
 
   const displayGeoJSONType = (geoJSONType) => {
-    setGeoJSONText(JSON.stringify(sampleGeoJSON[geoJSONType], null, 4));
-    setDoUpdate(true);
+    if (typeof window !== 'undefined') {
+      setGeoJSONText(JSON.stringify(sampleGeoJSON[geoJSONType], null, 4));
+      setDoUpdate(true);
+    }
   };
 
   useEffect(() => {
@@ -346,7 +356,7 @@ const GeoJSONViewer = () => {
             <div className="relative inline-block text-left">
               <div>
                 <button
-                  onClick={() => {closeAllDropdowns();displayGeoJSONType('GeometryCollection')}}
+                  onClick={() => { closeAllDropdowns(); displayGeoJSONType('GeometryCollection') }}
                   className="text-gray-800 inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium hover:bg-gray-100 focus:outline-none"
                 >
                   GeometryCollection
@@ -440,12 +450,5 @@ const GeoJSONViewer = () => {
   );
 };
 
-const Home = () => {
-  return (
-    <div>
-      <GeoJSONViewer />
-    </div>
-  );
-};
-
-export default Home;
+// export { GeoJSONViewer };
+export default GeoJSONViewer;
