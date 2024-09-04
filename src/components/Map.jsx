@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 
 import { sampleGeoJSON } from '@/libs/data';
@@ -9,6 +9,7 @@ const Map = () => {
   const [clearCurrent, setClearCurrent] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [doUpdate, setDoUpdate] = useState(false);
+
   const [dropdownOpen, setDropdownOpen] = useState({
     Point: false,
     LineString: false,
@@ -93,6 +94,10 @@ const Map = () => {
     }
     return null;
   };
+
+  useEffect(() => {
+    displayGeoJSONType('Point');
+  }, []);
 
   return (
     <div>
