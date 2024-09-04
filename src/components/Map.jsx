@@ -28,19 +28,20 @@ const Map = () => {
     });
   };
 
-  Open((prev) => {
-    const isCurrentlyOpen = prev[menu];
-    // Close all dropdowns if the current one is already open, otherwise close others and open the selected one
-    return {
-      Point: false,
-      LineString: false,
-      Polygon: false,
-      Feature: false,
-      GeometryCollection: false,
-      [menu]: !isCurrentlyOpen,
-    };
-  });
-};
+  const toggleDropdown = (menu) => {
+    setDropdownOpen((prev) => {
+      const isCurrentlyOpen = prev[menu];
+      // Close all dropdowns if the current one is already open, otherwise close others and open the selected one
+      return {
+        Point: false,
+        LineString: false,
+        Polygon: false,
+        Feature: false,
+        GeometryCollection: false,
+        [menu]: !isCurrentlyOpen,
+      };
+    });
+  };
 
   const handleGeoJSONChange = (event) => {
     setGeoJSONText(event.target.value);
