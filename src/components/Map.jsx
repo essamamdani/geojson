@@ -8,7 +8,7 @@ const Map = () => {
   const [geoJSONText, setGeoJSONText] = useState("");
   const [clearCurrent, setClearCurrent] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [doUpdate, setDoUpdate] = useState(false);
+  const [validatedGeoJSON, setValidatedGeoJSON] = useState(null); // Store validated GeoJSON
 
   const [dropdownOpen, setDropdownOpen] = useState({
     Point: false,
@@ -63,52 +63,56 @@ const Map = () => {
 
       const data = await response.json();
 
-      if (data.errors.length > 0) {
+      if (data.errors && data.errors.length > 0) {
         const errorMessage = data.errors
           .map((error) => `Line ${error.line}: ${error.message}`)
           .join('<br>');
         setErrorMessage(errorMessage);
+        setValidatedGeoJSON(null); // Clear the map on error
       } else {
         setErrorMessage('');
+        setValidatedGeoJSON(JSON.parse(geoJSONText)); // Store the validated GeoJSON
         if (clearCurrent) {
           setGeoJSONText('');
         }
-        setDoUpdate(true);
       }
     } catch (error) {
       console.error('Error validating GeoJSON:', error);
       setErrorMessage(
         'An error occurred while validating the GeoJSON. Please check your input.'
       );
+      setValidatedGeoJSON(null); // Clear the map on error
     }
   };
 
   const handleClearGeoJSON = () => {
     setGeoJSONText('');
+    setValidatedGeoJSON(null); // Clear the map on clear
   };
 
   const displayGeoJSONType = (geoJSONType) => {
-    setGeoJSONText(JSON.stringify(sampleGeoJSON[geoJSONType], null, 4));
-    setDoUpdate(true);
+    const geoJSON = sampleGeoJSON[geoJSONType];
+    setGeoJSONText(JSON.stringify(geoJSON, null, 4));
+    setValidatedGeoJSON(geoJSON); // Store the sample GeoJSON as validated
   };
+
+  useEffect(() => {
+    // Run displayGeoJSONType('Point') on component mount
+    displayGeoJSONType('Point');
+  }, []);
 
   const MyGeoJSONLayer = () => {
     const map = useMap();
-    if (geoJSONText) {
-      const geoJSON = JSON.parse(geoJSONText);
-      map.fitBounds(new L.GeoJSON(geoJSON).getBounds());
-      return <GeoJSON data={geoJSON} />;
+    if (validatedGeoJSON) {
+      map.fitBounds(new L.GeoJSON(validatedGeoJSON).getBounds());
+      return <GeoJSON data={validatedGeoJSON} />;
     }
     return null;
   };
 
-  useEffect(() => {
-    displayGeoJSONType('Point');
-  }, []);
-
   return (
     <div>
-     <nav className="bg-white p-4 shadow-md">
+      <nav className="bg-white p-4 shadow-md">
         <div className="container mx-auto flex flex-wrap justify-between items-center">
           <div className="text-gray-800 font-semibold text-xl">GeoJSONLint</div>
           <div className="space-x-4 flex flex-wrap items-center">
@@ -319,7 +323,7 @@ const Map = () => {
               placeholder="Paste GeoJSON here"
               className="form-control w-full mb-2 p-2 border border-gray-300 rounded text-black h-96"
               value={geoJSONText}
-              onChange={handleGeoJSONChange}
+              onChange={(e) => setGeoJSONText(e.target.value)}
             />
 
             <div className="mb-2 flex items-center">
@@ -359,7 +363,7 @@ const Map = () => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
-              {doUpdate && <MyGeoJSONLayer />}
+              <MyGeoJSONLayer />
             </MapContainer>
           </div>
         </div>
@@ -386,6 +390,5 @@ const Map = () => {
     </div>
   );
 };
-
 
 export default Map;
